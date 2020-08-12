@@ -10,7 +10,7 @@ using HidSharp.Reports.Input;
 
 namespace KrakenX63Driver
 {
-    public class KrakenX63
+    public class KrakenX63 : IDisposable
     {
         private const int _READ_LENGTH = 64;
         private const int _WRITE_LENGTH = 64;
@@ -102,6 +102,46 @@ namespace KrakenX63Driver
             WaterCooler,
             Wings
         }
+
+        private static HashSet<ColorEffect> marqueeEffects = new HashSet<ColorEffect> {
+            ColorEffect.Marquee3,
+            ColorEffect.Marquee4,
+            ColorEffect.Marquee5,
+            ColorEffect.Marquee6,
+            ColorEffect.BackwardsMarquee3,
+            ColorEffect.BackwardsMarquee4,
+            ColorEffect.BackwardsMarquee5,
+            ColorEffect.BackwardsMarquee6,
+            ColorEffect.CoveringMarquee,
+            ColorEffect.CoveringBackwardsMarquee
+        };
+
+        private static HashSet<ColorEffect> movingAlternatingEffects = new HashSet<ColorEffect>() { 
+            ColorEffect.MovingAlternating3,
+            ColorEffect.MovingAlternating4,
+            ColorEffect.MovingAlternating5,
+            ColorEffect.MovingAlternating6,
+            ColorEffect.BackwardsMovingAlternating3,
+            ColorEffect.BackwardsMovingAlternating4,
+            ColorEffect.BackwardsMovingAlternating5,
+            ColorEffect.BackwardsMovingAlternating6,
+        };
+
+        private static HashSet<ColorEffect> backwardsEffects = new HashSet<ColorEffect>() {
+            ColorEffect.BackwardsMarquee3,
+            ColorEffect.BackwardsMarquee4,
+            ColorEffect.BackwardsMarquee5,
+            ColorEffect.BackwardsMarquee6,
+            ColorEffect.BackwardsMovingAlternating3,
+            ColorEffect.BackwardsMovingAlternating4,
+            ColorEffect.BackwardsMovingAlternating5,
+            ColorEffect.BackwardsMovingAlternating6,
+            ColorEffect.BackwardsRainbowFlow,
+            ColorEffect.BackwardsRainbowPulse,
+            ColorEffect.BackwardsSpectrumWave,
+            ColorEffect.BackwardsSuperRainbow,
+            ColorEffect.CoveringBackwardsMarquee
+        };
 
         private static readonly Dictionary<ColorEffect, ColorMode> _COLOR_MODES = new Dictionary<ColorEffect, ColorMode>()
         {
@@ -225,29 +265,53 @@ namespace KrakenX63Driver
 
             this.hidStream.ReadTimeout = Timeout.Infinite;
 
-            this.writeBytes(new List<byte> { 0x10, 0x01 });
-            this.writeBytes(new List<byte> { 0x20, 0x03 });
-            this.writeBytes(new List<byte> { 0x70, 0x02, 0x01, 0xb8, 0x01 });
+            this.writeBytes(new List<byte> { 0x10, 0x01 }); // firmware info
+            this.writeBytes(new List<byte> { 0x20, 0x03 }); // lighting info
+            this.writeBytes(new List<byte> { 0x70, 0x02, 0x01, 0xb8, 0x01 }); // 0x01 = update interval
             this.writeBytes(new List<byte> { 0x70, 0x01 });
 
-            //this.hidStream.Write(new byte[] { 0x10, 0x01 }); // firmware info
-            //hidStream.Write(new byte[] { 0x20, 0x03 }); // lighting info
-            //hidStream.Write(new byte[] { 0x70, 0x02, 0x01, 0xb8, 0x01 }); // 0x01 = update interval
-            //hidStream.Write(new byte[] { 0x70, 0x01 });
-
-            for (int i = 0; i < 10; i++)
+            bool firmwareReceived = false;
+            bool lightingInfoReceived = false;
+            while (true)
             {
                 byte[] response = this.hidStream.Read();
+
                 Console.WriteLine($"Read:  {string.Join(" ", response.Select(a => a.ToString("X2")))}");
+
+                if (response[0] == 0x11 && response[1] == 0x01)
+                {
+                    string firmwareVersion = $"{response[0x11]}.{response[0x12]}.{response[0x13]}";
+                    Console.WriteLine($"Firmware Version: {firmwareVersion}");
+                    firmwareReceived = true;
+                }
+
+                if (response[0] == 0x21 && response[1] == 0x03)
+                {
+                    lightingInfoReceived = true;
+                }
+
+                if (firmwareReceived && lightingInfoReceived)
+                {
+                    break;
+                }
             }
 
-            //Console.WriteLine(string.Join(" ", response));
-
-            //string firmwareVersion = $"{response[0x11]}.{response[0x12]}.{response[0x13]}";
-            //Console.WriteLine($"Firmware Version: {firmwareVersion}");
-            //Console.WriteLine($"Channel Count: {response[14]}");
-
             stream.Flush();
+        }
+
+        public void Dispose()
+        {
+            this.hidStream.Dispose();
+        }
+
+        public string GetStatus()
+        {
+            this.hidStream.Flush();
+            byte[] response = this.hidStream.Read();
+            return 
+                $"Liquid temperature: {response[15] + response[16]/10} C\n" +
+                $"Pump speed: {response[18] << 8 | response[17]} rpm\n" +
+                $"Pump duty: {response[19]} %";
         }
 
         public bool SetColor(KrakenXColorChannel colorChannel, ColorEffect colorEffect, Color[] colors, AnimationSpeed speed)
@@ -277,11 +341,10 @@ namespace KrakenX63Driver
         {
             List<byte> cmds = new List<byte>();
 
-            int colorCount = colors.Length;
+            (byte timingByte1, byte timingByte2) speed_val = _SPEED_VALUE[mode.SpeedScale][sval];
+
             if (mode.Effect == ColorEffect.SuperFixed || mode.Effect == ColorEffect.SuperBreathing)
             {
-                (byte timingByte1, byte timingByte2) speed_val = _SPEED_VALUE[mode.SpeedScale][sval];
-
                 // Add header + colors + footer
                 cmds.AddRange(new byte[] { 0x22, 0x10, cid, 0x00 });
                 appendColorBytes(cmds, colors, mode.MaxColors);
@@ -315,9 +378,9 @@ namespace KrakenX63Driver
                 for (int i = 0; i < 8; i++)
                 {
                     byte mod = (byte)((i == 3 || i == 7) ? 0x05 : 0x01);
-                    (byte timingByte1, byte timingByte2) speed_val = _SPEED_VALUE[mode.SpeedScale][sval];
                     byte dir1 = (byte)((i / 4 == 0) ? 0x04 : 0x84);
                     byte dir2 = (byte)((i / 4 == 0) ? 0x84 : 0x04);
+
                     cmds.AddRange(new byte[] { 
                         0x22, 0x20, cid, (byte)i, 0x04, speed_val.timingByte1, speed_val.timingByte2, mod,
                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, dir1, dir2,
@@ -329,8 +392,65 @@ namespace KrakenX63Driver
                 }
                 this.writeBytes(0x22, 0x03, cid, 0x08); // Enable windows mode
             }
+            else
+            {
+                // Add headers
+                cmds.AddRange(new byte[] { 
+                    0x2a, 0x04, // opcode
+                    cid, cid,   // address
+                    mode.Mval,  // effect mode
+                    speed_val.timingByte1, speed_val.timingByte2 // speed 
+                });
 
-            return false;
+                // Add colors
+                appendColorBytes(cmds, colors, 16);
+
+                byte backwardsByte = 0x00;
+                byte modeRelatedByte = 0x00;
+                byte colorCount = (byte) colors.Length;
+
+                if (marqueeEffects.Contains(mode.Effect))
+                {
+                    backwardsByte = 0x04;
+                }
+                else if (mode.Effect == ColorEffect.StarryNight || movingAlternatingEffects.Contains(mode.Effect))
+                {
+                    backwardsByte = 0x01;
+                }
+
+                if (backwardsEffects.Contains(mode.Effect))
+                {
+                    backwardsByte += 0x02;
+                }
+
+                if (mode.Effect == ColorEffect.Fading || mode.Effect == ColorEffect.Pulse || mode.Effect == ColorEffect.Breathing)
+                {
+                    modeRelatedByte = 0x08;
+                }
+                else if (mode.Effect == ColorEffect.TaiChi)
+                {
+                    modeRelatedByte = 0x05;
+                }
+                else if (mode.Effect == ColorEffect.WaterCooler)
+                {
+                    modeRelatedByte = 0x05;
+                    colorCount = 0x01;
+                }
+                else if (mode.Effect == ColorEffect.Loading)
+                {
+                    modeRelatedByte = 0x04;
+                }
+
+                byte staticByte = _STATIC_VALUE[cid];
+                byte ledSize = (byte)((mode.Mval == 0x03 || mode.Mval == 0x05) ? mode.Variant : 0x03);
+
+                // Add footer
+                cmds.AddRange(new byte[] { backwardsByte, colorCount, modeRelatedByte, staticByte, ledSize });
+
+                this.writeBytes(cmds.ToArray());
+            }
+
+            return true;
         }
         
         private void writeBytes(params byte[] bytes)
