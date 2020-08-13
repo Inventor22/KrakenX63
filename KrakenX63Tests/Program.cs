@@ -18,6 +18,20 @@ namespace KrakenX63Tests
             //TestMarquee3();
             TestTaiChi();
             TestGetStatus();
+            TestLogoFixed();
+        }
+
+        public static void TestLogoFixed()
+        {
+            KrakenX63 x63 = new KrakenX63();
+
+            x63.SetColor(
+                KrakenX63.KrakenXColorChannel.Logo,
+                KrakenX63.ColorEffect.Fixed,
+                new Color[] {
+                    Color.FromArgb(255, 0, 80)
+                },
+                KrakenX63.AnimationSpeed.Normal);
         }
 
         public static void TestGetStatus()
@@ -30,12 +44,12 @@ namespace KrakenX63Tests
         {
             KrakenX63 x63 = new KrakenX63();
             
-            Color pink = Color.FromArgb(255, 0, 180);
+            Color pink = Color.FromArgb(255, 0, 80);
 
             x63.SetColor(
                 KrakenX63.KrakenXColorChannel.Ring,
                 KrakenX63.ColorEffect.TaiChi,
-                new Color[] { Color.FromKnownColor(KnownColor.DarkCyan), pink },
+                new Color[] { Color.DarkCyan, pink },
                 KrakenX63.AnimationSpeed.Slower);
         }
 
@@ -70,13 +84,13 @@ namespace KrakenX63Tests
                 KrakenX63.ColorEffect.SuperFixed,
                 new Color[] {
                     Color.FromArgb(0, 255, 255), // cyan
-                    Color.FromArgb(255, 0, 180), // pink
+                    Color.FromArgb(255, 0, 80), // pink
                     Color.FromArgb(0, 255, 255),
-                    Color.FromArgb(255, 0, 180),
+                    Color.FromArgb(255, 0, 80),
                     Color.FromArgb(0, 255, 255),
-                    Color.FromArgb(255, 0, 180),
+                    Color.FromArgb(255, 0, 80),
                     Color.FromArgb(0, 255, 255),
-                    Color.FromArgb(255, 0, 180)
+                    Color.FromArgb(255, 0, 80)
                 },
                 KrakenX63.AnimationSpeed.Slower);
 
@@ -84,7 +98,7 @@ namespace KrakenX63Tests
                 KrakenX63.KrakenXColorChannel.Logo,
                 KrakenX63.ColorEffect.SuperBreathing,
                 new Color[] {
-                    Color.FromArgb(255, 0, 180)
+                    Color.FromArgb(255, 0, 80)
                 },
                 KrakenX63.AnimationSpeed.Slower);
         }
@@ -105,7 +119,7 @@ namespace KrakenX63Tests
             KrakenX63 x63 = new KrakenX63();
 
             Color cyan = Color.FromArgb(0, 255, 255);
-            Color pink = Color.FromArgb(255, 0, 180);
+            Color pink = Color.FromArgb(255, 0, 80);
 
             Color[] colors1 = new Color[] { cyan, pink, cyan, pink, cyan, pink, cyan, pink };
             Color[] colors2 = new Color[] { pink, cyan, pink, cyan, pink, cyan, pink, cyan };

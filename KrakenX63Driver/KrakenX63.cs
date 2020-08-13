@@ -1,12 +1,16 @@
-﻿
+﻿// ************************************************************************************
+// Kraken X63 driver
+// Ported by Dustin Dobransky, from liquidctl by Tom Frey, Jonas Malaco and contributors
+// Original source: https://github.com/jonasmalacofilho/liquidctl
+// SPDX-License-Identifier: GPL-3.0-or-later
+// ************************************************************************************
+
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Threading;
 using HidSharp;
-using HidSharp.Reports;
-using HidSharp.Reports.Input;
 
 namespace KrakenX63Driver
 {
